@@ -11,7 +11,7 @@ URL_JSON = "https://cdn02.moecube.com:444/ygopro-super-pre/data/test-release.jso
 URL_YPK = "https://cdn02.moecube.com:444/ygopro-super-pre/archive/ygopro-super-pre.ypk"
 
 def main():
-    cc = opencc.OpenCC("s2hk.json")
+    cc = opencc.OpenCC("s2hk")
 
     # 1. 下載最新版本號字串
     req = urllib.request.Request(URL_VERSION, headers={"User-Agent": "Mozilla/5.0"})
