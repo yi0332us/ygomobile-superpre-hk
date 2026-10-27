@@ -41,7 +41,14 @@ def main():
         f.write(converted_json_text)
 
     # 3. 下載 ygopro-super-pre.ypk
-    subprocess.run(["curl", "-s", "-L", "--max-time", "60", "-o", "upstream.ypk", URL_YPK], check=True)
+    subprocess.run([
+        "curl", "-s", "-L",
+        "--http1.1",
+        "--retry", "3",
+        "--max-time", "300",
+        "-o", "upstream.ypk",
+        URL_YPK
+    ], check=True)
 
     # 4. 解壓 YPK
     extract_dir = "tmp_ypk"
