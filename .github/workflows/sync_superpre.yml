@@ -2,13 +2,18 @@ name: 同步與繁化官方先行卡
 
 on:
   schedule:
-    # 每天 UTC 04:00 (香港時間中午 12:00) 自動執行一次
+    # 每小時整點檢查一次（只喺上游版本有變先會真正下載同轉換）
     - cron: '0 * * * *'
-  workflow_dispatch: # 支援手動隨時觸發
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '強制重新下載同繁化（修正轉換邏輯後第一次要剔，否則版本一致會直接略過）'
+        type: boolean
+        default: false
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 
@@ -21,6 +26,9 @@ jobs:
           python3 -m pip install opencc-python-reimplemented
 
       - name: 檢查版本並執行簡繁轉換
+        env:
+          FORCE: ${{ inputs.force }}
+          OPENCC_CONFIG: s2twp
         run: |
           python3 sync_and_convert.py
 
