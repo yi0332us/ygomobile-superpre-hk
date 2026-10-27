@@ -1,0 +1,37 @@
+name: 同步與繁化官方先行卡
+
+on:
+  schedule:
+    # 每天 UTC 04:00 (香港時間中午 12:00) 自動執行一次
+    - cron: '0 * * * *'
+  workflow_dispatch: # 支援手動隨時觸發
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 檢出倉庫
+        uses: actions/checkout@v4
+
+      - name: 安裝 Python 與 OpenCC
+        run: |
+          python3 -m pip install opencc-python-reimplemented
+
+      - name: 檢查版本並執行簡繁轉換
+        run: |
+          python3 sync_and_convert.py
+
+      - name: 提交並推送更新
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.txt test-release.json ygopro-super-pre.ypk
+          if git diff --staged --quiet; then
+            echo "沒有任何更新，略過 commit"
+          else
+            git commit -m "自動更新：同步最新繁中先行卡"
+            git push
+          fi
