@@ -117,7 +117,7 @@ def fetch_pic(cid):
     return cid, None, None
 
 
-def report_and_fill_pics(work, base_cdb_path=None):
+def report_and_fill_pics(work, base_cdb_path=None, cc=None):
     """報告先行包內新卡嘅卡圖狀況；FILL_PICS 開啟時，由 CDN 補入 ypk 入面缺嘅卡圖。"""
     ypk_ids, jpgs = set(), []
     for root, _, files in os.walk(work):
@@ -138,6 +138,8 @@ def report_and_fill_pics(work, base_cdb_path=None):
             base_cdb_path = None
     if base_cdb_path and os.path.exists(base_cdb_path):
         base_ids = card_ids_from_cdb(base_cdb_path)
+    if cc is not None:
+        report_overlap(work, base_cdb_path, cc)
     print(f"=== 先行包卡圖狀況 ===")
     print(f"先行包 cdb 內卡數: {len(ypk_ids)} | 主程式卡庫卡數: {len(base_ids)} | ypk 內已有卡圖: {len(have)}（目錄 {pic_dir!r}）")
     if not base_ids:
@@ -171,6 +173,44 @@ def report_and_fill_pics(work, base_cdb_path=None):
 
 
 
+def names_by_id(path):
+    out = {}
+    try:
+        conn = sqlite3.connect(path)
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "texts" in tables:
+            for i, n in conn.execute("SELECT id, name FROM texts WHERE name != ''"):
+                out[str(i)] = n
+        conn.close()
+    except Exception as e:
+        print(f"::warning::讀 {path} 失敗: {e}")
+    return out
+
+
+def report_overlap(work, base_cdb_path, cc):
+    """診斷：先行包內嘅「臨時編號卡」（例如 100xxxxxx）同主卡庫正式編號（8 位）係咪同名重複。"""
+    base_names = names_by_id(base_cdb_path) if base_cdb_path and os.path.exists(base_cdb_path) else {}
+    if not base_names:
+        return
+    by_name = collections.defaultdict(list)
+    for i, n in base_names.items():
+        by_name[cc.convert(n)].append(i)   # 主卡庫係簡體，先轉成同先行包一樣嘅繁體再比對
+    for root, _, files in os.walk(work):
+        for fn in sorted(files):
+            if not fn.lower().endswith(".cdb"):
+                continue
+            names = names_by_id(os.path.join(root, fn))
+            in_base = [i for i in names if i in base_names]
+            temp_ids = [i for i in names if len(i) >= 9]
+            dup = [(i, by_name[names[i]]) for i in temp_ids if by_name.get(names[i])]
+            print(f"--- {fn}: 共 {len(names)} 張 | 同編號已喺主卡庫 {len(in_base)} 張 | 9 位以上臨時編號 {len(temp_ids)} 張 | 其中同名卡已有 8 位正式編號 {len(dup)} 張")
+            for i, formal in dup[:8]:
+                print(f"    {i} 《{names[i]}》 <-> 主卡庫編號 {', '.join(formal[:4])}")
+            for i in in_base[:5]:
+                print(f"    同編號例子 {i} 《{names[i]}》")
+
+
+
 def process_ypk(src_ypk, out_ypk, raw_json_text, cc, work="tmp_ypk"):
     if os.path.exists(work):
         shutil.rmtree(work)
@@ -201,7 +241,7 @@ def process_ypk(src_ypk, out_ypk, raw_json_text, cc, work="tmp_ypk"):
     if n_cdb == 0:
         raise SystemExit("ypk 入面搵唔到可轉換嘅 cdb（texts 表），停止，避免發布未繁化嘅檔案")
 
-    report_and_fill_pics(work, os.environ.get("BASE_CDB"))
+    report_and_fill_pics(work, os.environ.get("BASE_CDB"), cc)
 
     if os.path.exists(out_ypk):
         os.remove(out_ypk)
